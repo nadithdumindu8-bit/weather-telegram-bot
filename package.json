@@ -1,0 +1,9 @@
+{
+  "name": "skycast-weather-bot",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "latest",
+    "@netlify/functions": "latest"
+  }
+}
