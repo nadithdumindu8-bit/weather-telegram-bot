@@ -1,62 +1,28 @@
 # Weather Telegram Bot
 
-A simple Python Telegram bot that returns current weather for a city.
+A serverless Telegram weather bot designed to run on Netlify Functions.
 
-## Features
+## Deploy to Netlify
 
-- `/start` welcome message
-- `/help` command guide
-- `/weather <city>` current temperature, feels-like temperature, humidity, rainfall, wind, and conditions
-- City lookup and weather data via Open-Meteo
-- Async HTTP requests with `httpx`
-- Telegram bot powered by `python-telegram-bot`
+1. Import this GitHub repository into Netlify.
+2. No build command is required.
+3. Set the environment variable `BOT_TOKEN` to your Telegram bot token.
+4. Deploy the site.
+5. Set the Telegram webhook to:
 
-## Setup
+   `https://YOUR-NETLIFY-SITE.netlify.app/telegram/webhook`
 
-1. Create a virtual environment:
+   You can set it using Telegram's Bot API `setWebhook` method with your new bot token and that URL.
 
-```bash
-python -m venv .venv
-```
+## Commands
 
-2. Activate it:
+- `/start`
+- `/help`
+- `/weather Colombo`
+- `/weather Negombo`
 
-Windows:
-```bash
-.venv\Scripts\activate
-```
-
-Linux/macOS:
-```bash
-source .venv/bin/activate
-```
-
-3. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Set your Telegram bot token as an environment variable. Do not commit the token to GitHub.
-
-Windows PowerShell:
-```powershell
-$env:BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN"
-```
-
-Linux/macOS:
-```bash
-export BOT_TOKEN="YOUR_TELEGRAM_BOT_TOKEN"
-```
-
-5. Run the bot:
-
-```bash
-python bot.py
-```
-
-Then open the bot in Telegram and run `/weather Colombo`.
+Weather data is provided by Open-Meteo. No weather API key is required.
 
 ## Security
 
-The Telegram bot token is intentionally read from `BOT_TOKEN` rather than stored in source code. If a token has been exposed publicly, revoke/rotate it in Telegram's BotFather and update the environment variable.
+Never commit `BOT_TOKEN` to Git. Configure it in Netlify's environment variables instead. If a token has been exposed publicly, revoke it with Telegram's BotFather and generate a new one.
