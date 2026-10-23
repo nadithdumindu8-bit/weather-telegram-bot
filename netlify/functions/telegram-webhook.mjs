@@ -1,3 +1,5 @@
+import { getStore } from "@netlify/blobs";
+
 const WEATHER_URL = "https://api.open-meteo.com/v1/forecast";
 const GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NEWS_STORE = "skycast-news";
@@ -22,13 +24,10 @@ async function telegram(method, body) {
   return result;
 }
 
-async function newsState() {
-  const { getStore } = await import("@netlify/blobs");
-  return getStore(NEWS_STORE);
-}
+function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;"); }
 
 async function setNews(chatId, enabled) {
-  const store = await newsState();
+  const store = getStore(NEWS_STORE);
   const subscribers = (await store.get("subscribers", { type: "json" })) || {};
   if (enabled) subscribers[String(chatId)] = true;
   else delete subscribers[String(chatId)];
@@ -36,11 +35,7 @@ async function setNews(chatId, enabled) {
 }
 
 async function sendGreeting(chatId, firstName = "there") {
-  return telegram("sendMessage", {
-    chat_id: chatId,
-    text: `🌤️ <b>Hey ${escapeHtml(firstName)}!</b> Welcome to SkyCast!\n\nI’m your simple weather assistant. ☁️\n\n📍 Send me a city like:\n<code>/weather Colombo</code>\n\n📰 <b>Weather News</b>\nUse <code>/news on</code> to receive weather news automatically.\nUse <code>/news off</code> to stop it.\n\n🌎 <b>Ready? Ask me about any city!</b>`,
-    parse_mode: "HTML",
-  });
+  return telegram("sendMessage", { chat_id: chatId, text: `🌤️ <b>Hey ${escapeHtml(firstName)}!</b> Welcome to SkyCast!\n\nI’m your simple weather assistant. ☁️\n\n📍 <b>Weather</b>\n<code>/weather Colombo</code>\n\n📰 <b>Weather News</b>\n<code>/news on</code> — turn automatic weather news on\n<code>/news off</code> — turn it off\n\n🌎 Ready? Ask me about any city!`, parse_mode: "HTML" });
 }
 
 async function getWeather(city) {
@@ -62,24 +57,31 @@ async function handleMessage(message) {
   const text = message.text?.trim() || "";
   const firstName = message.from?.first_name || "there";
 
-  if (/^\/start(?:@\w+)?(?:\s+.*)?$/i.test(text)) { await sendGreeting(chatId, firstName); return; }
-  if (/^\/help(?:@\w+)?$/i.test(text)) { await sendGreeting(chatId, firstName); return; }
+  if (/^\/start(?:@\w+)?(?:\s+.*)?$/i.test(text) || /^\/help(?:@\w+)?$/i.test(text)) {
+    await sendGreeting(chatId, firstName);
+    return;
+  }
 
   const newsMatch = text.match(/^\/news(?:@\w+)?(?:\s+(on|off))?$/i);
   if (newsMatch) {
     const setting = newsMatch[1]?.toLowerCase();
     if (!setting) {
-      await telegram("sendMessage", { chat_id: chatId, text: "📰 Weather News is controlled with /news on or /news off." });
+      await telegram("sendMessage", { chat_id: chatId, text: "📰 Use /news on to subscribe or /news off to unsubscribe." });
       return;
     }
-    await setNews(chatId, setting === "on");
-    await telegram("sendMessage", {
-      chat_id: chatId,
-      text: setting === "on"
-        ? "📰 <b>Weather News: ON</b>\n\nYou’re subscribed to SkyCast weather news. I’ll send new weather-related updates automatically. 🌦️"
-        : "🔕 <b>Weather News: OFF</b>\n\nYou won’t receive automatic weather news anymore. You can turn it back on anytime with /news on.",
-      parse_mode: "HTML",
-    });
+    try {
+      await setNews(chatId, setting === "on");
+      await telegram("sendMessage", {
+        chat_id: chatId,
+        text: setting === "on"
+          ? "📰 <b>Weather News: ON</b>\n\nYou're subscribed to SkyCast weather news. 🌦️\nI'll send new weather-related updates automatically."
+          : "🔕 <b>Weather News: OFF</b>\n\nAutomatic weather news is disabled. You can turn it back on anytime with /news on.",
+        parse_mode: "HTML",
+      });
+    } catch (error) {
+      console.error("News subscription error:", error);
+      await telegram("sendMessage", { chat_id: chatId, text: "⚠️ I couldn't save your news preference right now. Please try /news on again in a moment." });
+    }
     return;
   }
 
@@ -90,14 +92,12 @@ async function handleMessage(message) {
   try {
     await telegram("sendChatAction", { chat_id: chatId, action: "typing" });
     const result = await getWeather(city);
-    if (!result) { await telegram("sendMessage", { chat_id: chatId, text: `❌ I couldn't find a location named '${city}'.` }); return; }
+    if (!result) { await telegram("sendMessage", { chat_id: chatId, text: `❌ I couldn't find a location named '${escapeHtml(city)}'.`, parse_mode: "HTML" }); return; }
     const { location, current, units } = result;
     const country = location.country ? `, ${location.country}` : "";
     await telegram("sendMessage", { chat_id: chatId, text: `🌤️ <b>Weather in ${escapeHtml(location.name)}${escapeHtml(country)}</b>\n\n${weatherDescription(current.weather_code)}\n🌡️ Temperature: <b>${current.temperature_2m}${units.temperature_2m}</b>\n🤔 Feels like: ${current.apparent_temperature}${units.apparent_temperature}\n💧 Humidity: ${current.relative_humidity_2m}${units.relative_humidity_2m}\n🌧️ Rain: ${current.rain}${units.rain}\n💨 Wind: ${current.wind_speed_10m} ${units.wind_speed_10m}\n\n🕐 Updated: ${current.time}`, parse_mode: "HTML" });
   } catch (error) { console.error(error); await telegram("sendMessage", { chat_id: chatId, text: "⚠️ I couldn't get the weather right now. Please try again." }); }
 }
-
-function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;"); }
 
 export default async (request) => {
   if (request.method === "GET") return new Response("SkyCast Telegram webhook is online.", { status: 200 });
