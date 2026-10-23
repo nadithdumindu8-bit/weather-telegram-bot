@@ -10,11 +10,11 @@ const STORE = "skycast-news";
 const MAX_ITEMS = 5;
 
 function extractItems(xml, source) {
-  return [...xml.matchAll(/<item[\\s\\S]*?<\\/item>/gi)].map((match) => {
+  return [...xml.matchAll(/<item[\s\S]*?<\/item>/gi)].map((match) => {
     const item = match[0];
     const text = (tag) => {
       const m = item.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
-      return m ? m[1].replace(/<!\\[CDATA\\[|\\]\\]>/g, "").replace(/<[^>]+>/g, "").trim() : "";
+      return m ? m[1].replace(/<!\[CDATA\[|\]\]>/g, "").replace(/<[^>]+>/g, "").trim() : "";
     };
     return { title: text("title"), link: text("link"), description: text("description"), source };
   }).filter((x) => x.title && x.link);
@@ -44,7 +44,7 @@ export default schedule("*/15 * * * *", async () => {
 
   for (const chatId of activeChats) {
     for (const item of fresh) {
-      const text = `🌦️ <b>SkyCast Weather News</b>\\n\\n📰 <b>${escapeHtml(item.title)}</b>\\n${escapeHtml(item.source)}\\n\\n${escapeHtml(item.description.slice(0, 350))}\\n\\n🔗 <a href="${item.link}">Read the full story</a>`;
+      const text = `🌦️ <b>SkyCast Weather News</b>\n\n📰 <b>${escapeHtml(item.title)}</b>\n${escapeHtml(item.source)}\n\n${escapeHtml(item.description.slice(0, 350))}\n\n🔗 <a href="${item.link}">Read the full story</a>`;
       await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "content-type": "application/json" },
